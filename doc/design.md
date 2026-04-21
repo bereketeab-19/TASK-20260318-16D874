@@ -45,7 +45,7 @@ The schema is mapped via Spring Data JPA. Constraints such as category depth and
 * **Inventory Alerts:** Handled internally via the `Notification` domain. A scheduled or event-driven check generates internal alerts when stock ≤ 10, completely avoiding external SMS/Email dependencies.
 
 ### Instant Messaging (IM) Domain
-* **WebSockets:** Configured via STOMP over WebSockets.
+* **WebSockets:** Configured via STOMP over WebSockets. Session creation is available both via REST (`POST /sessions`) and STOMP (`/app/sessions.create`); the latter publishes to `/topic/sessions.{merchantId}.lifecycle` and is subject to the same tenant-scoped subscription rules as chat message topics (`TopicScopeInterceptor`).
 * **Anti-Spam & Deduplication:** * Text folding: Cache recent messages by session; fold identical strings within 10 seconds.
     * Image deduplication: Calculate SHA-256 hashes of uploaded JPG/PNG files (≤ 2MB). Store hashes in the DB; if a hash exists, reuse the local file path instead of saving a duplicate.
 * **Retention Policy:** A Spring `@Scheduled` task executes daily during low-traffic hours to `DELETE` messages older than 180 days.

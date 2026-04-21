@@ -3,6 +3,7 @@ package com.petsupplies.product.service;
 import com.petsupplies.auditing.service.AuditService;
 import com.petsupplies.notification.domain.Notification;
 import com.petsupplies.notification.repo.NotificationRepository;
+import com.petsupplies.notification.service.NotificationSubscriptionService;
 import com.petsupplies.product.domain.Product;
 import com.petsupplies.product.domain.Sku;
 import com.petsupplies.product.repo.SkuRepository;
@@ -22,6 +23,7 @@ public class InventoryService {
   private final AuditService auditService;
   private final MerchantSettingsService merchantSettingsService;
   private final InventoryLogService inventoryLogService;
+  private final NotificationSubscriptionService notificationSubscriptionService;
   private final Clock clock;
 
   public InventoryService(
@@ -30,6 +32,7 @@ public class InventoryService {
       AuditService auditService,
       MerchantSettingsService merchantSettingsService,
       InventoryLogService inventoryLogService,
+      NotificationSubscriptionService notificationSubscriptionService,
       Clock clock
   ) {
     this.skuRepository = skuRepository;
@@ -37,6 +40,7 @@ public class InventoryService {
     this.auditService = auditService;
     this.merchantSettingsService = merchantSettingsService;
     this.inventoryLogService = inventoryLogService;
+    this.notificationSubscriptionService = notificationSubscriptionService;
     this.clock = clock;
   }
 
@@ -96,6 +100,9 @@ public class InventoryService {
       sku.setBarcode(barcode.trim());
     }
     if (stockQuantity != null) {
+      if (stockQuantity < 0) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "stockQuantity must be >= 0");
+      }
       sku.setStockQuantity(stockQuantity);
     }
     Sku saved = skuRepository.save(sku);
@@ -173,14 +180,16 @@ public class InventoryService {
     }
     int threshold = merchantSettingsService.getLowStockThreshold(sku.getMerchantId());
     if (sku.getStockQuantity() <= threshold) {
-      Instant now = Instant.now(clock);
-      Notification n = new Notification();
-      n.setMerchantId(sku.getMerchantId());
-      n.setContent("Low stock for barcode=" + sku.getBarcode() + " qty=" + sku.getStockQuantity() + " (threshold=" + threshold + ")");
-      n.setCreatedAt(now);
-      n.setDeliveredAt(now);
-      n.setEventType("LOW_STOCK");
-      notificationRepository.save(n);
+      if (notificationSubscriptionService.isDeliveryEnabled(sku.getMerchantId(), "LOW_STOCK")) {
+        Instant now = Instant.now(clock);
+        Notification n = new Notification();
+        n.setMerchantId(sku.getMerchantId());
+        n.setContent("Low stock for barcode=" + sku.getBarcode() + " qty=" + sku.getStockQuantity() + " (threshold=" + threshold + ")");
+        n.setCreatedAt(now);
+        n.setDeliveredAt(now);
+        n.setEventType("LOW_STOCK");
+        notificationRepository.save(n);
+      }
 
       auditService.record(
           "INVENTORY_THRESHOLD_REACHED",

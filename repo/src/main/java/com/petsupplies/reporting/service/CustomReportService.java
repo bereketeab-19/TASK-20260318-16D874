@@ -6,7 +6,10 @@ import com.petsupplies.auditing.service.AuditService;
 import com.petsupplies.reporting.domain.CustomReportDefinition;
 import com.petsupplies.reporting.repo.CustomReportDefinitionRepository;
 import com.petsupplies.reporting.repo.ReportingRepository;
+import com.petsupplies.notification.repo.NotificationRepository;
 import com.petsupplies.product.repo.InventoryLogRepository;
+import com.petsupplies.product.repo.ProductRepository;
+import com.petsupplies.product.repo.SkuRepository;
 import com.petsupplies.reporting.web.dto.CreateCustomReportRequest;
 import com.petsupplies.reporting.web.dto.UpdateCustomReportRequest;
 import java.time.Clock;
@@ -14,6 +17,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -31,11 +35,19 @@ public class CustomReportService {
   public static final String TPL_INVENTORY_DRILL_DOWN = "INVENTORY_DRILL_DOWN";
   /** Time-series of inventory movement units from {@code inventory_logs} (half-open date range {@code from} .. {@code to}). */
   public static final String TPL_INVENTORY_MOVEMENT_TIMELINE = "INVENTORY_MOVEMENT_TIMELINE";
+  /**
+   * Organization + business + time slice: inventory totals, active catalog counts, notifications by {@code event_type}
+   * since {@code sinceDays} (default 90).
+   */
+  public static final String TPL_BUSINESS_DIMENSION_SUMMARY = "BUSINESS_DIMENSION_SUMMARY";
 
   private final CustomReportDefinitionRepository customReportDefinitionRepository;
   private final ReportingService reportingService;
   private final ReportingRepository reportingRepository;
   private final InventoryLogRepository inventoryLogRepository;
+  private final NotificationRepository notificationRepository;
+  private final ProductRepository productRepository;
+  private final SkuRepository skuRepository;
   private final AuditService auditService;
   private final ObjectMapper objectMapper;
   private final Clock clock;
@@ -45,6 +57,9 @@ public class CustomReportService {
       ReportingService reportingService,
       ReportingRepository reportingRepository,
       InventoryLogRepository inventoryLogRepository,
+      NotificationRepository notificationRepository,
+      ProductRepository productRepository,
+      SkuRepository skuRepository,
       AuditService auditService,
       ObjectMapper objectMapper,
       Clock clock
@@ -53,6 +68,9 @@ public class CustomReportService {
     this.reportingService = reportingService;
     this.reportingRepository = reportingRepository;
     this.inventoryLogRepository = inventoryLogRepository;
+    this.notificationRepository = notificationRepository;
+    this.productRepository = productRepository;
+    this.skuRepository = skuRepository;
     this.auditService = auditService;
     this.objectMapper = objectMapper;
     this.clock = clock;
@@ -176,6 +194,7 @@ public class CustomReportService {
       case TPL_INVENTORY_SUMMARY -> inventorySummaryData(merchantId);
       case TPL_INVENTORY_DRILL_DOWN -> inventoryDrillDownData(merchantId, root);
       case TPL_INVENTORY_MOVEMENT_TIMELINE -> movementTimelineData(merchantId, root);
+      case TPL_BUSINESS_DIMENSION_SUMMARY -> businessDimensionSummaryData(merchantId, root);
       default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown template: " + template);
     };
   }
@@ -244,6 +263,38 @@ public class CustomReportService {
     m.put("to", to);
     m.put("timezone", "UTC");
     m.put("series", series);
+    return m;
+  }
+
+  private Map<String, Object> businessDimensionSummaryData(String merchantId, JsonNode root) {
+    int sinceDays = root.path("sinceDays").asInt(90);
+    sinceDays = Math.min(3650, Math.max(1, sinceDays));
+    Instant since = Instant.now(clock).minus(sinceDays, ChronoUnit.DAYS);
+    var inv = reportingRepository.inventorySummary(merchantId);
+    long activeProducts = productRepository.countByMerchantIdAndActiveTrue(merchantId);
+    long activeSkus = skuRepository.countByMerchantIdAndActiveTrue(merchantId);
+    List<Object[]> raw = notificationRepository.countByEventTypeSince(merchantId, since);
+    List<Map<String, Object>> byEvent = new ArrayList<>();
+    for (Object[] row : raw) {
+      Map<String, Object> e = new LinkedHashMap<>();
+      String et = row[0] == null ? "UNKNOWN" : String.valueOf(row[0]);
+      long c = row[1] instanceof Number n ? n.longValue() : 0L;
+      e.put("eventType", et);
+      e.put("count", c);
+      byEvent.add(e);
+    }
+    Map<String, Object> m = new LinkedHashMap<>();
+    m.put("template", TPL_BUSINESS_DIMENSION_SUMMARY);
+    m.put("merchantId", merchantId);
+    m.put("sinceDays", sinceDays);
+    m.put("sinceInstant", since);
+    m.put("dimensions", Map.of(
+        "organization", Map.of("merchantId", merchantId),
+        "time", Map.of("windowDays", sinceDays),
+        "inventory", Map.of("totalSkus", inv.getTotalSkus(), "totalStock", inv.getTotalStock()),
+        "catalog", Map.of("activeProducts", activeProducts, "activeSkus", activeSkus),
+        "businessEvents", byEvent
+    ));
     return m;
   }
 

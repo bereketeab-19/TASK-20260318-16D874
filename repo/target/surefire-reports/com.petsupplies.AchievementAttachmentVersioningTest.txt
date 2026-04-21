@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.petsupplies.AchievementAttachmentVersioningTest
 -------------------------------------------------------------------------------
-Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 63.32 s -- in com.petsupplies.AchievementAttachmentVersioningTest
+Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 66.22 s -- in com.petsupplies.AchievementAttachmentVersioningTest

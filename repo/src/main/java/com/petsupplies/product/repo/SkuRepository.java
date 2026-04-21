@@ -20,6 +20,8 @@ public interface SkuRepository extends JpaRepository<Sku, Long> {
 
   long countByMerchantId(String merchantId);
 
+  long countByMerchantIdAndActiveTrue(String merchantId);
+
   @Modifying
   @Query("UPDATE Sku s SET s.stockQuantity = :qty WHERE s.id = :id AND s.merchantId = :merchantId")
   int updateStockScoped(@Param("id") Long id, @Param("qty") int qty, @Param("merchantId") String merchantId);

@@ -1,7 +1,9 @@
 package com.petsupplies.reporting.web;
 
 import com.petsupplies.core.security.CurrentPrincipal;
+import com.petsupplies.reporting.service.ReportingAccessAuditService;
 import com.petsupplies.reporting.service.ReportingService;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,15 +23,27 @@ import org.springframework.web.bind.annotation.RestController;
 public class ReportingController {
   private final CurrentPrincipal currentPrincipal;
   private final ReportingService reportingService;
+  private final ReportingAccessAuditService reportingAccessAuditService;
 
-  public ReportingController(CurrentPrincipal currentPrincipal, ReportingService reportingService) {
+  public ReportingController(
+      CurrentPrincipal currentPrincipal,
+      ReportingService reportingService,
+      ReportingAccessAuditService reportingAccessAuditService
+  ) {
     this.currentPrincipal = currentPrincipal;
     this.reportingService = reportingService;
+    this.reportingAccessAuditService = reportingAccessAuditService;
   }
 
   @GetMapping("/api/admin/reports/definitions")
-  public List<Map<String, Object>> indicatorDefinitions(Authentication authentication) {
-    currentPrincipal.requireSecurityUser(authentication);
+  public List<Map<String, Object>> indicatorDefinitions(Authentication authentication, HttpServletRequest request) {
+    var user = currentPrincipal.requireSecurityUser(authentication);
+    reportingAccessAuditService.record(
+        "ADMIN_REPORT_DEFINITIONS_READ",
+        user.getUsername(),
+        request.getRemoteAddr(),
+        Map.of("path", request.getRequestURI())
+    );
     return reportingService.listIndicatorDefinitions().stream()
         .map(d -> {
           Map<String, Object> m = new LinkedHashMap<>();
@@ -43,8 +57,18 @@ public class ReportingController {
   }
 
   @GetMapping("/api/admin/reports/inventory/{merchantId}")
-  public Map<String, Object> inventorySummary(Authentication authentication, @PathVariable("merchantId") String merchantId) {
-    currentPrincipal.requireSecurityUser(authentication);
+  public Map<String, Object> inventorySummary(
+      Authentication authentication,
+      HttpServletRequest request,
+      @PathVariable("merchantId") String merchantId
+  ) {
+    var user = currentPrincipal.requireSecurityUser(authentication);
+    reportingAccessAuditService.record(
+        "ADMIN_REPORT_INVENTORY_SUMMARY_READ",
+        user.getUsername(),
+        request.getRemoteAddr(),
+        Map.of("merchantId", merchantId, "path", request.getRequestURI())
+    );
     var row = reportingService.inventorySummary(merchantId);
     return Map.of(
         "merchantId", merchantId,
@@ -56,11 +80,18 @@ public class ReportingController {
   @GetMapping("/api/admin/reports/inventory/{merchantId}/drill-down")
   public Map<String, Object> inventoryDrillDown(
       Authentication authentication,
+      HttpServletRequest request,
       @PathVariable("merchantId") String merchantId,
       @RequestParam(defaultValue = "0") int page,
       @RequestParam(defaultValue = "20") int size
   ) {
-    currentPrincipal.requireSecurityUser(authentication);
+    var user = currentPrincipal.requireSecurityUser(authentication);
+    reportingAccessAuditService.record(
+        "ADMIN_REPORT_INVENTORY_DRILLDOWN_READ",
+        user.getUsername(),
+        request.getRemoteAddr(),
+        Map.of("merchantId", merchantId, "page", page, "size", size, "path", request.getRequestURI())
+    );
     Page<Map<String, Object>> p = reportingService.inventoryDrillDown(merchantId, page, size);
     return Map.of(
         "content", p.getContent(),
@@ -74,9 +105,16 @@ public class ReportingController {
   @GetMapping("/api/admin/reports/inventory/{merchantId}/export.csv")
   public ResponseEntity<byte[]> exportInventory(
       Authentication authentication,
+      HttpServletRequest request,
       @PathVariable("merchantId") String merchantId
   ) {
-    currentPrincipal.requireSecurityUser(authentication);
+    var user = currentPrincipal.requireSecurityUser(authentication);
+    reportingAccessAuditService.record(
+        "ADMIN_REPORT_INVENTORY_EXPORT_READ",
+        user.getUsername(),
+        request.getRemoteAddr(),
+        Map.of("merchantId", merchantId, "path", request.getRequestURI())
+    );
     byte[] body = reportingService.exportInventoryCsv(merchantId);
     return ResponseEntity.ok()
         .contentType(new MediaType("text", "csv"))
@@ -87,10 +125,17 @@ public class ReportingController {
   @GetMapping("/api/admin/reports/inventory/{merchantId}/daily")
   public List<Map<String, Object>> dailyHistory(
       Authentication authentication,
+      HttpServletRequest request,
       @PathVariable("merchantId") String merchantId,
       @RequestParam(defaultValue = "30") int limit
   ) {
-    currentPrincipal.requireSecurityUser(authentication);
+    var user = currentPrincipal.requireSecurityUser(authentication);
+    reportingAccessAuditService.record(
+        "ADMIN_REPORT_DAILY_HISTORY_READ",
+        user.getUsername(),
+        request.getRemoteAddr(),
+        Map.of("merchantId", merchantId, "limit", limit, "path", request.getRequestURI())
+    );
     return reportingService.dailyHistory(merchantId, limit).stream()
         .map(r -> {
           Map<String, Object> m = new LinkedHashMap<>();

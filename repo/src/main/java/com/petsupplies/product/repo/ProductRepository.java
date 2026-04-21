@@ -14,6 +14,8 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
   long countByMerchantId(String merchantId);
 
+  long countByMerchantIdAndActiveTrue(String merchantId);
+
   List<Product> findByMerchantIdAndActiveTrueOrderByCreatedAtDesc(String merchantId);
 
   long countByCategory_Id(Long categoryId);

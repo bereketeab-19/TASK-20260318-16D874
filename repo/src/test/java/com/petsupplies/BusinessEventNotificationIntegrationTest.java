@@ -31,7 +31,8 @@ class BusinessEventNotificationIntegrationTest extends AbstractIntegrationTest {
                 .contentType(APPLICATION_JSON)
                 .content("{\"orderRef\":\"ORD-42\",\"status\":\"SHIPPED\"}"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.eventType").value(BusinessNotificationService.EVENT_ORDER_STATUS));
+        .andExpect(jsonPath("$.eventType").value(BusinessNotificationService.EVENT_ORDER_STATUS))
+        .andExpect(jsonPath("$.notificationPersisted").value(true));
 
     mockMvc.perform(
             post("/api/merchant/events/review-outcome")
@@ -39,7 +40,8 @@ class BusinessEventNotificationIntegrationTest extends AbstractIntegrationTest {
                 .contentType(APPLICATION_JSON)
                 .content("{\"reviewRef\":\"REV-7\",\"outcome\":\"APPROVED\"}"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.eventType").value(BusinessNotificationService.EVENT_REVIEW_OUTCOME));
+        .andExpect(jsonPath("$.eventType").value(BusinessNotificationService.EVENT_REVIEW_OUTCOME))
+        .andExpect(jsonPath("$.notificationPersisted").value(true));
 
     MvcResult list = mockMvc.perform(get("/notifications").with(httpBasic("merchantA", "merchantA123!")))
         .andExpect(status().isOk())

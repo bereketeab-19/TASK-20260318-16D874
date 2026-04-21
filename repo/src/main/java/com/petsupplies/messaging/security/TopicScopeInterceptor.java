@@ -15,13 +15,15 @@ import org.springframework.stereotype.Component;
 /**
  * Enforces that subscriptions to merchant-scoped topics match the authenticated principal merchantId.
  *
- * Allowed subscription pattern:
+ * Allowed subscription patterns:
  * /topic/messages.{merchantId}
  * /topic/messages.{merchantId}.{sessionId}
+ * /topic/sessions.{merchantId}.lifecycle (session create events over STOMP)
  */
 @Component
 public class TopicScopeInterceptor implements ChannelInterceptor {
-  private static final Pattern DEST_PATTERN = Pattern.compile("^/topic/messages\\.([^\\.]+)(?:\\.(\\d+))?$");
+  private static final Pattern DEST_PATTERN_MESSAGES = Pattern.compile("^/topic/messages\\.([^\\.]+)(?:\\.(\\d+))?$");
+  private static final Pattern DEST_PATTERN_SESSIONS = Pattern.compile("^/topic/sessions\\.([^\\.]+)\\.lifecycle$");
 
   @Override
   public Message<?> preSend(Message<?> message, MessageChannel channel) {
@@ -38,10 +40,18 @@ public class TopicScopeInterceptor implements ChannelInterceptor {
   }
 
   private static String extractMerchantId(String destination) {
-    if (destination == null) return null;
-    Matcher m = DEST_PATTERN.matcher(destination);
-    if (!m.matches()) return null;
-    return m.group(1);
+    if (destination == null) {
+      return null;
+    }
+    Matcher m1 = DEST_PATTERN_MESSAGES.matcher(destination);
+    if (m1.matches()) {
+      return m1.group(1);
+    }
+    Matcher m2 = DEST_PATTERN_SESSIONS.matcher(destination);
+    if (m2.matches()) {
+      return m2.group(1);
+    }
+    return null;
   }
 
   private static SecurityUser securityUser(Principal principal) {

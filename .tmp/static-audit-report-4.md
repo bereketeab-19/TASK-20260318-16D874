@@ -1,213 +1,254 @@
-# Static Delivery Acceptance and Architecture Audit
+# Static Audit Report - Pet Supplies Backend
 
 ## 1. Verdict
-- Overall conclusion: **Fail**
-- Basis: The repository is substantial and professionally structured, but it does not fully implement several explicit prompt requirements (notably cooking technique cards and reporting custom-report capability), and buyer-role business capability is largely absent. These are material requirement-fit gaps.
+- Overall conclusion: **Partial Pass**
 
 ## 2. Scope and Static Verification Boundary
-- What was reviewed: `README.md`, `docs/*`, `pom.xml`, runtime/config files, Flyway migrations, controllers/services/repositories/domains under `src/main/java`, tests under `src/test/java`, backup/TLS infra files.
-- What was not reviewed: runtime behavior in a live environment, Docker/container execution, actual DB runtime semantics under target deployment, network/TLS handshake behavior, scheduler execution timing in production.
-- What was intentionally not executed: application startup, tests, Docker Compose, Docker, external services.
-- Claims requiring manual verification:
-- TLS is correctly configured at runtime and all traffic paths actually terminate over TLS.
-- Scheduled tasks (2:00 AM cron, 30s autosave) execute reliably in deployment timezone/clock setup.
-- Backup **recovery** (restore correctness, RPO/RTO) is not statically proven.
+- Reviewed:
+  - Project docs/config: `README.md`, `docs/*.md`, `docker-compose.yml`, `Dockerfile`, `backup/*`, `nginx/nginx.conf`, `application.yml`, Flyway migrations.
+  - Backend implementation: controllers, services, repositories, security config, scheduling, crypto, auditing.
+  - Tests: unit and integration tests under `src/test/java` (static read only).
+- Not reviewed:
+  - Runtime behavior in live environment, container orchestration execution, actual DB/network/TLS handshakes.
+- Intentionally not executed:
+  - Application startup, tests, Docker, external services.
+- Manual verification required for:
+  - End-to-end startup using documented compose command.
+  - Runtime TLS hardening behavior and cert trust path.
+  - Backup/restore execution path correctness and RTO/RPO under failure.
 
 ## 3. Repository / Requirement Mapping Summary
-- Prompt core goal mapped: offline Spring Boot monolith with MySQL, multi-domain backend (auth/session, product/SKU/category/brand/attributes/inventory alerts, messaging, notifications, reporting, cooking assistance, achievements), and compliance controls (TLS, encryption, dual approval, immutable audit, backup).
-- Main implementation areas mapped: `config/security`, domain modules (`product`, `messaging`, `notification`, `reporting`, `cooking`, `achievement`, `auditing`, `user`), Flyway schema constraints, and integration/unit tests.
-- Key constraints observed in code: lockout 5/15, category depth trigger <=4, SKU/product unique indexes, message retention 180 days, dual-approval workflow, audit trigger immutability.
+- Prompt core goal: offline Spring Boot monolith for 4 roles (admin/merchant/buyer/reviewer), with auth+lockout, product/SKU/category/brand/attributes/inventory alerts, messaging (WS + anti-spam + recall/read), internal notifications with subscriptions, reporting center, cooking assistance, achievements versioning, and security/compliance controls.
+- Main mapped areas:
+  - Auth/security: `src/main/java/com/petsupplies/config/SecurityConfig.java`, lockout/password/profile services, audit subsystem.
+  - Domain APIs: product/messaging/notification/reporting/cooking/achievement controllers/services.
+  - Persistence constraints: Flyway migrations `V1..V16`.
+  - Operational constraints: TLS proxy and backup cron configs.
+  - Static test evidence: security/object-scope/role/access and selected business flows.
 
 ## 4. Section-by-section Review
 
-### 4.1 Hard Gate 1.1 Documentation and static verifiability
-- Conclusion: **Pass**
-- Rationale: Clear startup/test/config instructions and explicit endpoint mapping exist; structure is statically reviewable.
-- Evidence: `README.md:7`, `README.md:12`, `README.md:43`, `README.md:76`, `docs/api-spec.md:1`, `pom.xml:25`, `src/main/resources/application.yml:5`
+### 4.1 Hard Gates
 
-### 4.2 Hard Gate 1.2 Material deviation from Prompt
-- Conclusion: **Fail**
-- Rationale: Major prompt items are not materially implemented (technique cards; reporting custom-report capability; limited buyer-role business flows).
-- Evidence: `src/main/java/com/petsupplies/cooking/web/CookingController.java:33`, `src/main/java/com/petsupplies/reporting/web/ReportingController.java:30`, `src/main/java/com/petsupplies/reporting/web/ReviewerReportingController.java:30`, `README.md:43`, `src/main/java/com/petsupplies/user/domain/Role.java:3`
-- Manual verification note: Not required; gaps are static.
-
-### 4.3 Delivery Completeness 2.1 Core requirements coverage
+#### 4.1.1 Documentation and static verifiability
 - Conclusion: **Partial Pass**
-- Rationale: Most core domains are present, but explicit features are missing/partial (technique cards, custom reports, buyer capabilities).
-- Evidence: `src/main/java/com/petsupplies/user/service/UserLockoutService.java:16`, `src/main/java/com/petsupplies/product/service/BatchImportService.java:57`, `src/main/java/com/petsupplies/messaging/service/MessageService.java:65`, `src/main/java/com/petsupplies/notification/service/BusinessNotificationService.java:24`, `src/main/java/com/petsupplies/reporting/service/ReportingService.java:124`, `src/main/java/com/petsupplies/cooking/service/CookingService.java:43`, `src/main/java/com/petsupplies/achievement/service/AchievementService.java:43`
+- Rationale:
+  - Positives: README includes startup/test/config guidance and endpoint inventory; docs include API and backup runbook.
+  - Material gap: documented startup command is statically inconsistent with compose build context for app image.
+- Evidence:
+  - `README.md:12`, `README.md:16`
+  - `docker-compose.yml:27`, `docker-compose.yml:28`, `docker-compose.yml:29`
+  - `docs/api-spec.md:1`, `docs/backup-recovery.md` (runbook content present)
+- Manual verification note:
+  - Need manual `docker compose up --build` attempt to confirm if `context: ..` resolves correctly in intended filesystem layout.
 
-### 4.4 Delivery Completeness 2.2 End-to-end 0-to-1 deliverable
-- Conclusion: **Pass**
-- Rationale: Complete multi-module monolith structure, migrations, docs, infra, and extensive tests exist; not a toy snippet.
-- Evidence: `src/main/java/com/petsupplies/Application.java:6`, `src/main/resources/db/migration/V1__init.sql:1`, `docker-compose.yml:1`, `README.md:1`, `src/test/java/com/petsupplies/AbstractIntegrationTest.java:12`
-
-### 4.5 Engineering Quality 3.1 Structure and modular decomposition
-- Conclusion: **Pass**
-- Rationale: Domain-oriented package decomposition with controllers/services/repos and coherent boundaries.
-- Evidence: `docs/design.md:6`, `src/main/java/com/petsupplies/product/service/ProductService.java:17`, `src/main/java/com/petsupplies/messaging/service/MessageService.java:20`, `src/main/java/com/petsupplies/auditing/service/PendingApprovalService.java:29`
-
-### 4.6 Engineering Quality 3.2 Maintainability/extensibility
+#### 4.1.2 Material deviation from Prompt
 - Conclusion: **Partial Pass**
-- Rationale: Code is generally maintainable, but several business areas are hard-coded to narrow flows (reporting inventory-only; no technique-card extensibility surface).
-- Evidence: `src/main/java/com/petsupplies/reporting/web/ReportingController.java:45`, `src/main/java/com/petsupplies/reporting/service/ReportingService.java:61`, `src/main/java/com/petsupplies/cooking/web/CookingController.java:33`
+- Rationale:
+  - Core monolith and most domains are implemented and prompt-aligned.
+  - Major functional deviation: notification subscription preferences are stored/queryable but not enforced during notification dispatch.
+- Evidence:
+  - Subscription APIs: `src/main/java/com/petsupplies/notification/web/NotificationController.java:66`, `src/main/java/com/petsupplies/notification/service/NotificationSubscriptionService.java:53`
+  - Event dispatch bypassing subscriptions: `src/main/java/com/petsupplies/notification/service/BusinessNotificationService.java:25`, `src/main/java/com/petsupplies/product/service/InventoryService.java:175`
+  - Docs claim delivery preferences semantics: `docs/api-spec.md:90`, `docs/api-spec.md:92`
 
-### 4.7 Engineering Details 4.1 Professional engineering details
+### 4.2 Delivery Completeness
+
+#### 4.2.1 Coverage of explicit core requirements
 - Conclusion: **Partial Pass**
-- Rationale: Strong validation/error handling/auditing present, but role controls for merchant APIs are implicit (merchantId-based) rather than explicit role guards, and some requirements are under-tested.
-- Evidence: `src/main/java/com/petsupplies/core/exceptions/GlobalExceptionHandler.java:26`, `src/main/java/com/petsupplies/config/SecurityConfig.java:85`, `src/main/java/com/petsupplies/product/web/ProductController.java:32`, `src/main/java/com/petsupplies/core/security/CurrentPrincipal.java:18`
+- Rationale:
+  - Implemented: lockout policy, PBKDF2 passwords, category depth <=4, unique product code/barcode constraints, inventory threshold default 10, WS session/message publish+recall/read, 180-day purge, dual approval, audit append-only, cooking checkpoint/autosave, achievement version increment/export, reporting APIs/scheduled daily generation.
+  - Gaps:
+    - Notification subscription effect missing (preferences not applied).
+    - IM read/unread support is only write-side (`markRead`), with no message status query endpoint.
+- Evidence:
+  - Lockout: `src/main/java/com/petsupplies/user/service/UserLockoutService.java:16`, `:17`, `:49`
+  - Category depth DB trigger: `src/main/resources/db/migration/V5__category_depth_triggers.sql:26`
+  - Unique constraints: `src/main/resources/db/migration/V4__product_inventory.sql:30`, `:43`
+  - 180-day retention: `src/main/java/com/petsupplies/scheduling/MessageRetentionTask.java:28`
+  - Subscription preference APIs only: `src/main/java/com/petsupplies/notification/service/NotificationSubscriptionService.java:36`, `:53`
+  - Messaging HTTP routes lack status/list query route beyond recall/read/image: `src/main/java/com/petsupplies/messaging/web/MessagingHttpController.java:26`, `:38`, `:49`
 
-### 4.8 Engineering Details 4.2 Product/service realism
+#### 4.2.2 0-to-1 deliverable completeness
 - Conclusion: **Pass**
-- Rationale: Appears as a real backend service with persistence, security, scheduled tasks, and governance workflows.
-- Evidence: `src/main/java/com/petsupplies/auditing/web/ApprovalController.java:35`, `src/main/java/com/petsupplies/scheduling/MessageRetentionTask.java:25`, `src/main/java/com/petsupplies/reporting/service/ReportingService.java:124`
+- Rationale:
+  - Complete multi-module monolith, DB migrations, docs, backup scripts, tests, and deployment artifacts are present.
+- Evidence:
+  - Entrypoint: `src/main/java/com/petsupplies/Application.java:6`
+  - Migrations: `src/main/resources/db/migration/V1__init.sql:1` ... `V16__notification_event_subscriptions.sql:1`
+  - README/test scripts: `README.md:79`, `run_tests.sh:5`, `run_tests.ps1:5`
 
-### 4.9 Prompt Understanding 5.1 Requirement semantics and fit
-- Conclusion: **Fail**
-- Rationale: Several explicit prompt semantics are not fully met (technique cards, custom reports, broad four-role capability coverage).
-- Evidence: `src/main/java/com/petsupplies/cooking/service/CookingService.java:107`, `src/main/java/com/petsupplies/reporting/web/ReportingController.java:30`, `README.md:43`, `docs/api-spec.md:169`
+### 4.3 Engineering and Architecture Quality
 
-### 4.10 Aesthetics 6.1 (frontend-only)
+#### 4.3.1 Structure and module decomposition
+- Conclusion: **Pass**
+- Rationale:
+  - Clear domain-based packages and layered controller/service/repo structure; no single-file anti-pattern.
+- Evidence:
+  - Module organization doc: `docs/design.md:10`-`docs/design.md:20`
+  - Representative domain split: `src/main/java/com/petsupplies/product/*`, `messaging/*`, `reporting/*`, `auditing/*`
+
+#### 4.3.2 Maintainability and extensibility
+- Conclusion: **Partial Pass**
+- Rationale:
+  - Generally maintainable with transactional service boundaries and repository scoping.
+  - Maintainability risk: notification preference model is disconnected from dispatch logic, creating dead configuration surface.
+- Evidence:
+  - Preference persistence: `src/main/java/com/petsupplies/notification/service/NotificationSubscriptionService.java:53`
+  - Dispatch paths ignoring preference check: `src/main/java/com/petsupplies/notification/service/BusinessNotificationService.java:25`, `src/main/java/com/petsupplies/product/service/InventoryService.java:175`
+
+### 4.4 Engineering Details and Professionalism
+
+#### 4.4.1 Error handling, logging, validation, API design
+- Conclusion: **Partial Pass**
+- Rationale:
+  - Strong: centralized error envelope, security handlers, method validation in many DTOs, audit log trails.
+  - Gaps:
+    - `PATCH /skus/{id}` allows negative `stockQuantity` due missing validation annotation.
+    - Log desensitization exists but only masks plain 11-18 digit sequences; coverage for diverse sensitive formats cannot be guaranteed statically.
+- Evidence:
+  - Global error handling: `src/main/java/com/petsupplies/core/exceptions/GlobalExceptionHandler.java:27`, `:95`
+  - Security handlers: `src/main/java/com/petsupplies/core/web/SecurityExceptionHandlers.java:17`
+  - Missing stock lower-bound in update DTO: `src/main/java/com/petsupplies/product/web/dto/UpdateSkuRequest.java:6`
+  - Create DTO has bound (contrast): `src/main/java/com/petsupplies/product/web/dto/CreateSkuRequest.java:11`
+  - Log mask pattern: `src/main/resources/logback-spring.xml:4`
+
+#### 4.4.2 Product-like vs demo-like organization
+- Conclusion: **Pass**
+- Rationale:
+  - Includes real DB migrations, security, scheduling, audit, backup scripts, and role-based API surfaces.
+- Evidence:
+  - Dual approval + audit: `src/main/java/com/petsupplies/auditing/service/PendingApprovalService.java:92`
+  - Backup cron and retention: `backup/crontab:1`, `backup/retention.sh:7`
+
+### 4.5 Prompt Understanding and Requirement Fit
+
+#### 4.5.1 Business goal/semantics/constraints fit
+- Conclusion: **Partial Pass**
+- Rationale:
+  - Major prompt semantics mostly implemented.
+  - Significant misses: subscription preferences not affecting delivery; static startup inconsistency undermines verifiability of offline delivery claim.
+- Evidence:
+  - Prompt-fit implementations: lockout `UserLockoutService.java:16`, append-only audit trigger `V2__audit_log_immutability_grants.sql:12`, category depth `V5__category_depth_triggers.sql:26`, daily 2:00 reports `ReportingService.java:124`
+  - Delivery mismatch: `README.md:16` vs `docker-compose.yml:28`
+  - Subscription semantics mismatch: `docs/api-spec.md:92` vs `BusinessNotificationService.java:25`
+
+### 4.6 Aesthetics (frontend-only)
 - Conclusion: **Not Applicable**
-- Rationale: Backend-only repository; no frontend page/UI deliverable in scope.
-- Evidence: `README.md:1`, `src/main/java/com/petsupplies/Application.java:6`
+- Rationale: backend-only repository.
+- Evidence: no frontend application assets/routes in reviewed scope.
 
 ## 5. Issues / Suggestions (Severity-Rated)
 
-### Blocker / High
-- Severity: **High**
-- Title: Missing cooking technique-card capability (text + tags)
-- Conclusion: **Fail**
-- Evidence: `src/main/java/com/petsupplies/cooking/web/CookingController.java:33`, `src/main/java/com/petsupplies/cooking/service/CookingService.java:107`, `src/main/resources/db/migration/V7__cooking_and_achievements.sql:1`
-- Impact: Explicit prompt feature is absent; cooking-assistance domain is incomplete.
-- Minimum actionable fix: Add technique-card entity/schema (text, tags), CRUD/query APIs, service layer, and tests covering validation and tenant scope.
+### Blocker
 
-- Severity: **High**
-- Title: Reporting center lacks custom-report capability
+1. **Compose startup path is statically inconsistent with documented command**
+- Severity: **Blocker**
 - Conclusion: **Fail**
-- Evidence: `src/main/java/com/petsupplies/reporting/web/ReportingController.java:45`, `src/main/java/com/petsupplies/reporting/service/ReportingService.java:61`, `src/main/resources/db/migration/V8__reporting_and_approvals.sql:17`
-- Impact: Prompt requirement ?supports custom reports? is unmet; only fixed inventory report flows are implemented.
-- Minimum actionable fix: Add report definition/query model and APIs for custom report creation, parameterized execution, and scheduling metadata, with role/audit controls.
+- Evidence: `README.md:16`, `docker-compose.yml:28`, `docker-compose.yml:29`, `Dockerfile:1`
+- Impact: reviewers/users may be unable to build/start using documented steps; hard gate 1.1 is at risk.
+- Minimum actionable fix: set app build context to current repo root (or align README path/invocation with current `context: ..` layout explicitly).
 
+### High
+
+2. **Notification subscription preferences are not enforced in notification dispatch**
 - Severity: **High**
-- Title: Buyer role business capability is minimally implemented
 - Conclusion: **Fail**
-- Evidence: `src/main/java/com/petsupplies/user/domain/Role.java:3`, `README.md:43`, `src/main/java/com/petsupplies/core/security/CurrentPrincipal.java:18`, `src/main/java/com/petsupplies/user/web/MeController.java:12`
-- Impact: Prompt expects resource-domain capabilities for regular buyers, but current API surface is effectively merchant/admin/reviewer-centric.
-- Minimum actionable fix: Define and implement buyer-facing domain flows (at minimum read/query flows tied to business requirements) with explicit role authorization and tests.
+- Evidence: `src/main/java/com/petsupplies/notification/service/NotificationSubscriptionService.java:53`, `src/main/java/com/petsupplies/notification/service/BusinessNotificationService.java:25`, `src/main/java/com/petsupplies/product/service/InventoryService.java:175`, `docs/api-spec.md:90`, `docs/api-spec.md:92`
+- Impact: merchants can disable an event type but still receive notifications, violating documented behavior and prompt intent for subscription capability.
+- Minimum actionable fix: gate all publish paths by `(merchantId,eventType)` preference lookup with default-enabled fallback.
+
+3. **IM read/unread capability is only partial (write without query surface)**
+- Severity: **High**
+- Conclusion: **Partial Fail**
+- Evidence: `src/main/java/com/petsupplies/messaging/web/MessagingHttpController.java:38`, `src/main/java/com/petsupplies/messaging/service/MessageService.java:170`, `docs/api-spec.md:131`
+- Impact: system can mark messages read but does not expose a message retrieval/read-state API, so read/unread status is not fully usable.
+- Minimum actionable fix: add tenant-scoped message listing/detail endpoint returning `readAt`/`recalledAt` (or equivalent status projection).
 
 ### Medium
-- Severity: **Medium**
-- Title: Merchant endpoint authorization is implicit, not explicit role-guarded
-- Conclusion: **Partial Pass**
-- Evidence: `src/main/java/com/petsupplies/product/web/ProductController.java:32`, `src/main/java/com/petsupplies/messaging/web/SessionHttpController.java:24`, `src/main/java/com/petsupplies/core/security/CurrentPrincipal.java:18`, `src/main/resources/db/migration/V3__merchant_context.sql:4`
-- Impact: Security relies on merchantId presence and DB invariants; explicit route-level merchant role checks are missing, increasing misconfiguration risk.
-- Minimum actionable fix: Add `@PreAuthorize("hasRole('MERCHANT')")` (or equivalent authority guards) to merchant-only controllers and add negative tests for non-merchant principals.
 
+4. **Offline self-contained claim is not statically guaranteed (build/test paths rely on external image/dependency sources unless pre-seeded)**
 - Severity: **Medium**
-- Title: Backup strategy includes backup generation but lacks explicit recovery procedure/evidence
-- Conclusion: **Partial Pass**
-- Evidence: `backup/backup.sh:16`, `backup/crontab:1`, `backup/retention.sh:5`, `README.md:3`
-- Impact: Compliance asks for backup and recovery strategy; recovery path is not statically documented/proven.
-- Minimum actionable fix: Add restore runbook/scripts and static verification steps (restore to isolated DB, checksum/integrity checks).
+- Conclusion: **Cannot Confirm Statistically**
+- Evidence: `README.md:3`, `Dockerfile:1`, `Dockerfile:4`, `docker-compose.yml:3`, `docker-compose.yml:58`, `run_tests.sh:17`
+- Impact: in strictly air-gapped environments, build/test/start may fail if base images and Maven artifacts are not preloaded.
+- Minimum actionable fix: provide an explicit air-gap packaging procedure (preloaded image tarballs + local Maven/cache mirror) and document it.
 
-### Low
-- Severity: **Low**
-- Title: Image validation trusts MIME type header only
-- Conclusion: **Partial Pass**
-- Evidence: `src/main/java/com/petsupplies/messaging/service/AttachmentService.java:43`
-- Impact: Crafted files with spoofed content type may bypass intended image-type restriction.
-- Minimum actionable fix: Add file-signature (magic-byte) validation for PNG/JPEG before persistence.
+5. **SKU update path permits negative stock values**
+- Severity: **Medium**
+- Conclusion: **Fail**
+- Evidence: `src/main/java/com/petsupplies/product/web/dto/UpdateSkuRequest.java:6`, `src/main/java/com/petsupplies/product/service/InventoryService.java:98`
+- Impact: invalid inventory states can be persisted, corrupting alerts/reports.
+- Minimum actionable fix: add `@Min(0)` to update DTO stock field and/or enforce invariant in service.
 
 ## 6. Security Review Summary
 
-- authentication entry points: **Pass**
-- Evidence/reasoning: HTTP Basic is enforced globally except `/health`; lockout logic is implemented with 5-failure/15-minute policy. `src/main/java/com/petsupplies/config/SecurityConfig.java:80`, `src/main/java/com/petsupplies/user/service/UserLockoutService.java:16`
-
-- route-level authorization: **Partial Pass**
-- Evidence/reasoning: Admin/reviewer routes use explicit `@PreAuthorize`, but merchant routes mostly depend on `requireMerchantId` rather than explicit role guards. `src/main/java/com/petsupplies/reporting/web/ReportingController.java:20`, `src/main/java/com/petsupplies/product/web/ProductController.java:32`, `src/main/java/com/petsupplies/core/security/CurrentPrincipal.java:18`
-
-- object-level authorization: **Pass**
-- Evidence/reasoning: Merchant-scoped repository lookups (`findByIdAndMerchantId`) are widely used; cross-tenant not-found semantics are implemented. `src/main/java/com/petsupplies/product/repo/SkuRepository.java:14`, `src/main/java/com/petsupplies/messaging/repo/SessionRepository.java:8`, `src/main/java/com/petsupplies/product/service/ProductService.java:82`
-
-- function-level authorization: **Partial Pass**
-- Evidence/reasoning: Sensitive admin/reporting actions are role-protected; sender-only recall is enforced. Merchant-role explicit annotations are generally absent. `src/main/java/com/petsupplies/auditing/web/ApprovalController.java:19`, `src/main/java/com/petsupplies/messaging/service/MessageService.java:154`
-
-- tenant / user isolation: **Pass**
-- Evidence/reasoning: Merchant ID is derived from principal and used in service/repository scoping; WebSocket topic scope interceptor enforces merchant topic match. `src/main/java/com/petsupplies/core/security/CurrentPrincipal.java:18`, `src/main/java/com/petsupplies/messaging/security/TopicScopeInterceptor.java:33`
-
-- admin / internal / debug protection: **Partial Pass**
-- Evidence/reasoning: Admin endpoints are guarded; `/health` is intentionally public; no obvious unguarded debug endpoints found. Runtime confirmation for all actuator/internal routes is manual. `src/main/java/com/petsupplies/core/web/AdminController.java:10`, `src/main/java/com/petsupplies/core/web/HealthController.java:9`, `src/main/resources/application.yml:30`
+- Authentication entry points: **Pass**
+  - Evidence: HTTP Basic and centralized auth config `src/main/java/com/petsupplies/config/SecurityConfig.java:80`, lockout in `DbUserDetailsService.java:33` and `UserLockoutService.java:49`.
+- Route-level authorization: **Pass**
+  - Evidence: method-level guards across domains (`@PreAuthorize`) e.g. `ApprovalController.java:19`, `ProductController.java:22`, `BuyerCatalogController.java:18`.
+- Object-level authorization: **Partial Pass**
+  - Evidence: scoped repository access patterns (`findByIdAndMerchantId`) e.g. `ProductService.java:83`, `MessageService.java:149`, `CustomReportService.java:81`.
+  - Note: achievements rely on merchant scoping for record access, but `userId` binding integrity is not constrained by FK/ownership checks (`Achievement.java:21`).
+- Function-level authorization: **Pass**
+  - Evidence: sender-only recall check `MessageService.java:154`; dual-approval anti-self-execute `PendingApprovalService.java:96`.
+- Tenant/user data isolation: **Pass**
+  - Evidence: cross-tenant 404 behavior in service/repo patterns and dedicated tests (`ProductHeistIntegrationTest.java:45`, `MessagingRecallAndNotificationAuthzIntegrationTest.java:86`).
+- Admin/internal/debug protection: **Pass**
+  - Evidence: `/admin/ping` requires admin `AdminController.java:10`; admin approvals/report routes guarded by `ApprovalController.java:19`, `ReportingController.java:22`.
 
 ## 7. Tests and Logging Review
 
-- Unit tests: **Pass**
-- Evidence: `src/test/java/com/petsupplies/core/validation/PasswordPolicyTest.java:8`, `src/test/java/com/petsupplies/TopicScopeInterceptorTest.java:17`
-
-- API / integration tests: **Partial Pass**
-- Evidence: `src/test/java/com/petsupplies/SecurityIntegrationTest.java:45`, `src/test/java/com/petsupplies/ProductHeistIntegrationTest.java:21`, `src/test/java/com/petsupplies/DualApprovalIntegrationTest.java:45`, `src/test/java/com/petsupplies/BatchImportAtomicityTest.java:23`
-- Reasoning: Good breadth, but key missing coverage remains (technique cards/custom reports/buyer capabilities and several negative security paths).
-
-- Logging categories / observability: **Partial Pass**
-- Evidence: `src/main/resources/logback-spring.xml:3`, `src/main/java/com/petsupplies/auditing/service/AuditService.java:27`
-- Reasoning: Audit events are comprehensive; broader observability metadata (trace IDs/correlation IDs, structured request logs) is limited.
-
-- Sensitive-data leakage risk in logs / responses: **Partial Pass**
-- Evidence: `src/main/resources/logback-spring.xml:4`, `src/main/java/com/petsupplies/user/domain/User.java:42`
-- Reasoning: At-rest encryption exists for contact field; console masking is regex-limited and may not mask all PII shapes.
+- Unit tests: **Pass (basic)**
+  - Evidence: `src/test/java/com/petsupplies/core/validation/PasswordPolicyTest.java:10`, `TopicScopeInterceptorTest.java:18`.
+- API/integration tests: **Partial Pass**
+  - Evidence: role/auth/object-scope and multiple domain flows covered (`SecurityIntegrationTest.java:46`, `DualApprovalIntegrationTest.java:47`, `AttachmentMagicBytesIntegrationTest.java:29`, `CustomReportIntegrationTest.java:51`).
+  - Gaps: no test proving subscription preference enforcement, no static test for retention scheduler execution path, no backup restore test.
+- Logging categories/observability: **Pass (basic)**
+  - Evidence: audit service and reporting-read audit hooks (`AuditService.java:27`, `ReportingAccessAuditService.java:25`), logback configured (`logback-spring.xml:12`).
+- Sensitive-data leakage risk in logs/responses: **Partial Pass**
+  - Evidence: mask exists (`logback-spring.xml:4`) and audit payloads avoid raw passwords; however masking rule scope is narrow and not comprehensively verified.
 
 ## 8. Test Coverage Assessment (Static Audit)
 
 ### 8.1 Test Overview
-- Unit tests exist: yes.
-- API/integration tests exist: yes (MockMvc + SpringBootTest + Testcontainers MySQL).
-- Frameworks: JUnit 5, Spring Boot Test, Spring Security Test, Testcontainers.
-- Test entry points: Maven `verify` and helper scripts.
-- Documentation has test command: yes.
-- Evidence: `pom.xml:88`, `src/test/java/com/petsupplies/AbstractIntegrationTest.java:12`, `README.md:76`, `run_tests.sh:4`, `run_tests.ps1:5`
+- Unit tests exist: yes (`PasswordPolicyTest`, `TopicScopeInterceptorTest`).
+- Integration tests exist: yes (multiple `*IntegrationTest` extending `AbstractIntegrationTest`).
+- Frameworks: JUnit 5, Spring Boot Test, MockMvc, Spring Security Test, Testcontainers (`pom.xml:89`, `:95`, `:99`; `AbstractIntegrationTest.java:15`).
+- Test entry points documented: yes (`README.md:83`, `run_tests.sh:5`, `run_tests.ps1:5`).
 
 ### 8.2 Coverage Mapping Table
+
 | Requirement / Risk Point | Mapped Test Case(s) | Key Assertion / Fixture / Mock | Coverage Assessment | Gap | Minimum Test Addition |
 |---|---|---|---|---|---|
-| 401 unauthenticated | `src/test/java/com/petsupplies/SecurityIntegrationTest.java:46` | `status().isUnauthorized()` `SecurityIntegrationTest.java:48` | sufficient | None | None |
-| 403 role boundary (admin/reviewer) | `SecurityIntegrationTest.java:52`, `:58`, `:64`, `:76` | Forbidden assertions at `:54`, `:60`, `:66`, `:78` | sufficient | Merchant-route explicit role denial not directly tested | Add tests for buyer/reviewer/admin on merchant endpoints expecting 403 |
-| Lockout 5 failures / 15 min | `SecurityIntegrationTest.java:82` | Loop of 5 bad creds + mutable clock advance `:85-101` | sufficient | None | None |
-| Object-level tenant isolation (SKU) | `ProductHeistIntegrationTest.java:22` | Cross-tenant read returns 404 `:45-46` | basically covered | Coverage limited to SKU read | Add cross-tenant tests for notifications/messages/achievements/cooking |
-| Batch import all-or-nothing CSV | `BatchImportAtomicityTest.java:24` | Bad request and zero persisted `:49-53` | sufficient | No success-path assert in same class | Add happy-path import test with expected created counts |
-| Batch import all-or-nothing XLSX | `BatchImportAtomicityXlsxTest.java:26` | Bad request and zero persisted `:39-43` | sufficient | No success-path assert in same class | Add successful XLSX import/export round-trip |
-| Messaging anti-spam duplicate fold in 10s | `MessagingAntiSpamIntegrationTest.java:24` | `folded=true` and persisted count=1 `:31-35` | sufficient | Boundary (exactly 10s) not checked | Add edge tests at 10s and >10s |
-| Attachment dedup + tenant scoping | `AttachmentDedupIntegrationTest.java:51`, `:68` | Same merchant same ID `:61`; different merchants different IDs `:79` | sufficient | HTTP layer negative validation gaps | Add HTTP tests for invalid MIME/oversize/spoofed file |
-| Notification events surfaced | `BusinessEventNotificationIntegrationTest.java:27` | Event types found in `/notifications` `:50-51` | basically covered | Read-at timestamp update path not tested | Add `/notifications/{id}/read` tests for own/other merchant |
-| Dual approval workflow | `DualApprovalIntegrationTest.java:45`, `:128`, `:169` | second-admin execution, self-approval blocked, reject non-execution | sufficient | Invalid payload/error-path coverage limited | Add malformed payload and unsupported op-type tests |
-| Reporting aggregation | `ReportingAggregationIntegrationTest.java:18` | Total SKU/stock assert `:26-27` | basically covered | Custom-report capability absent and untested | Add tests once custom reports exist |
-| Cooking checkpoint/resume | `CookingResumptionTest.java:23` | checkpoint then GET state match `:40-47` | basically covered | 30s autosave + step/timer/reminder paths under-tested | Add integration tests for auto-checkpoint scheduler and timer/reminder endpoints |
-| Achievement validation/versioning | `AchievementValidationTest.java:20`, `AchievementAttachmentVersioningTest.java:30` | bad request and version increment checks `:32`, `VersioningTest.java:41-44` | basically covered | Assessment template export behavior not tested | Add export-format tests for certificate/assessment templates |
+| 401 unauthenticated | `SecurityIntegrationTest.java:46` | `GET /me` -> 401 | sufficient | none | n/a |
+| 403 role boundary | `SecurityIntegrationTest.java:52`, `MerchantRoleGuardIntegrationTest.java:22` | buyer denied admin/merchant routes | sufficient | none | n/a |
+| Lockout 5 failures / 15 min | `SecurityIntegrationTest.java:82` | mutable clock + fail x5 + unlock after +16m | sufficient | none | n/a |
+| Tenant isolation product/SKU | `ProductHeistIntegrationTest.java:22` | merchantB GET merchantA SKU -> 404 | sufficient | none | n/a |
+| Messaging recall authz | `MessagingRecallAndNotificationAuthzIntegrationTest.java:43` | non-sender forbidden, cross-tenant not found | sufficient | none | n/a |
+| Topic subscription scope | `TopicScopeInterceptorTest.java:42` | cross-merchant topic subscribe denied | sufficient | none | n/a |
+| Attachment type/size/dedup | `AttachmentMagicBytesIntegrationTest.java:48`, `AttachmentDedupIntegrationTest.java:62` | signature mismatch 400; dedup behavior | basically covered | size >2MB case not covered | add multipart >2MB rejection test |
+| Batch import atomicity | `BatchImportAtomicityTest.java:24`, `BatchImportAtomicityXlsxTest.java:26` | malformed row -> no persisted rows | sufficient | none | n/a |
+| Dual approval (four-eyes) | `DualApprovalIntegrationTest.java:129` | self-approval blocked; second admin executes | sufficient | none | n/a |
+| Notification mark-read scope | `MessagingRecallAndNotificationAuthzIntegrationTest.java:92` | other merchant mark-read -> 404 | sufficient | none | n/a |
+| Notification subscription enforcement | none | n/a | missing | preferences not asserted against dispatch | add tests disabling event then asserting no notification persisted |
+| Message retention 180 days purge | none | n/a | missing | scheduler/data-retention path untested | add repository/service-level retention test with controlled clock |
+| Reporting access audit trail | indirect only | no direct assertion on `REPORT_READ` audit entries | insufficient | audit requirement could regress undetected | add assertion tests for audit log writes on reporting endpoints |
 
 ### 8.3 Security Coverage Audit
-- authentication: **sufficiently covered** for 401 and lockout (`SecurityIntegrationTest.java:46`, `:82`).
-- route authorization: **partially covered**; admin/reviewer role checks are tested, merchant-route explicit role checks are not.
-- object-level authorization: **partially covered**; SKU cross-tenant case is covered, broader object-scope surfaces are not.
-- tenant / data isolation: **partially covered**; repository design is strong and one cross-tenant test exists, but full domain breadth not tested.
-- admin / internal protection: **basically covered** for approval/reporting routes; no explicit tests for every internal/actuator path.
-- Conclusion: Severe defects could still remain undetected in untested merchant-route authorization and domain-wide object-level isolation edges.
+- Authentication: **Basically covered** (`SecurityIntegrationTest` lockout + unauthenticated).
+- Route authorization: **Covered** (`SecurityIntegrationTest`, `MerchantRoleGuardIntegrationTest`, `BuyerCatalogIntegrationTest`).
+- Object-level authorization: **Covered for key merchant flows** (`ProductHeistIntegrationTest`, `MessagingRecallAndNotificationAuthzIntegrationTest`, `TechniqueCardIntegrationTest`).
+- Tenant/data isolation: **Covered for several domains, not exhaustive** (no dedicated isolation test for every endpoint, e.g., achievements export attachments cross-tenant).
+- Admin/internal protection: **Covered** (`SecurityIntegrationTest` admin surfaces + `DualApprovalIntegrationTest`).
 
 ### 8.4 Final Coverage Judgment
-**Partial Pass**
-- Covered well: authentication baseline, lockout, dual approval core flow, import atomicity, key messaging anti-spam behavior.
-- Not covered enough: full route/object authorization matrix, buyer-role business flows, technique-card/custom-report features (also not implemented), and recovery/scheduler operational correctness.
+- **Partial Pass**
+- Boundary:
+  - Covered: core authn/authz, key tenant isolation flows, dual approval, batch atomicity, attachment validations.
+  - Uncovered high-risk areas: notification subscription enforcement, retention scheduler behavior, and some audit-trail assertions; severe defects in these areas could remain while current tests still pass.
 
 ## 9. Final Notes
-- This is a static-only evidence-based audit; runtime behavior claims were not made.
-- Major findings were consolidated by root cause to avoid repetition.
-- Items marked as manual verification are operational/runtime by nature (TLS runtime, scheduler execution, recovery drills).
-
-## 10. Remediation tracking (post-audit implementation)
-
-| Item | Evidence |
-|------|----------|
-| Cooking technique cards (V13, CRUD, tags, MERCHANT) | `V13__cooking_technique_cards.sql`, `TechniqueCardController`, `TechniqueCardIntegrationTest` |
-| Custom report definitions + execute + audit | `V14__custom_report_definitions.sql`, `CustomReportController`, `CustomReportService`, `CustomReportIntegrationTest` |
-| Buyer catalog read APIs (`ROLE_BUYER`) | `BuyerCatalogController`, `BuyerCatalogIntegrationTest` |
-| Explicit `ROLE_MERCHANT` on merchant REST + STOMP | Merchant controllers `@PreAuthorize`, `MessagingController` merchant check, `MerchantRoleGuardIntegrationTest` |
-| Backup / restore runbook | `docs/backup-recovery.md`, `backup/restore.sh`, README ?Backup and restore? |
-| JPEG/PNG magic-byte validation | `AttachmentService`, `AttachmentMagicBytesIntegrationTest`; dedup/messaging tests updated for valid signatures |
-| API docs | `docs/api-spec.md`, `README.md` |
+- Static evidence indicates a substantial backend implementation with meaningful tests and security controls.
+- The main acceptance risks are concentrated in startup verifiability (`docker-compose` inconsistency) and requirement semantics gaps (notification subscriptions and IM read/unread completeness).
+- Runtime success claims are intentionally not made; items marked Cannot Confirm Statistically require manual validation.

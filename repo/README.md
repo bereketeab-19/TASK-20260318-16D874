@@ -52,14 +52,16 @@ Authentication style (Phase 1): **HTTP Basic**.
 - `POST /batch/import/skus/xlsx` (MERCHANT-only; all-or-nothing)
 - `GET /batch/export/skus/csv` (MERCHANT-only)
 - `GET /notifications` (MERCHANT-only; merchant-scoped)
+- `GET /notifications/subscriptions` / `PUT /notifications/subscriptions` (MERCHANT-only; per-event-type delivery preferences)
 - `GET /inventory/logs` (MERCHANT-only; paginated inventory change history)
 - `POST /attachments` (MERCHANT-only; JPG/PNG ≤ 2MB; magic-byte validation; SHA-256 dedup per merchant)
 - `GET /api/buyer/catalog/products` / `GET /api/buyer/catalog/summary` (BUYER-only; read-only catalog)
 
 ## Phase 3 (Messaging) endpoints
 - WebSocket STOMP endpoint: `GET /ws`
-- Publish: `/app/messages.sendText`
-- Subscribe (merchant-scoped): `/topic/messages.{merchantId}.{sessionId}`
+- Publish: `/app/messages.sendText`, `/app/messages.sendImage`, `/app/sessions.create` (session creation over STOMP mirrors `POST /sessions`)
+- Subscribe (merchant-scoped): `/topic/messages.{merchantId}.{sessionId}` and `/topic/sessions.{merchantId}.lifecycle` (session create events when using STOMP)
+- REST: `GET /sessions/{sessionId}/messages` (paginated history with read/recall state), `GET /sessions/{sessionId}/messages/{messageId}`
 
 ## Phase 4 (Cooking & Achievements) endpoints
 - `POST /cooking/processes` (MERCHANT-only; start a process)
@@ -74,6 +76,9 @@ Authentication style (Phase 1): **HTTP Basic**.
 - `POST /api/admin/approvals/{id}/reject` (ADMIN-only; must be different admin)
 - `GET /api/admin/approvals/pending` (ADMIN-only)
 - `GET /api/admin/reports/inventory/{merchantId}` (ADMIN-only; native SQL projection)
+
+## Air-gapped / offline builds
+Fully disconnected hosts still need **container base images** (e.g. `mysql:8.0`, `eclipse-temurin:17`) and **Maven dependencies** unless you preload them. Practical approach: on a connected machine run `docker pull` / `docker save` for required images, and `mvn dependency:go-offline` (or copy a populated `~/.m2/repository`) before transferring the project. Point Compose or Maven at those local artifacts when building.
 
 ## Verification
 Run all tests:

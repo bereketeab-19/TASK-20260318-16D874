@@ -60,7 +60,7 @@ Auth style: **HTTP Basic** (Phase 1 baseline). All endpoints are under the Nginx
 - `POST /skus`
   - Body: `{"productId":1,"barcode":"BAR1","stockQuantity":5}`
 - `GET /skus/{id}` — includes `productId`, `active`
-- `PATCH /skus/{id}` — body (optional): `{"stockQuantity":3,"barcode":"BAR2"}`
+- `PATCH /skus/{id}` — body (optional): `{"stockQuantity":3,"barcode":"BAR2"}` (`stockQuantity` must be **≥ 0** when provided)
 - `POST /skus/{id}/delist` — sets `active` false (excluded from inventory aggregates)
 
 ### Inventory log (merchant-scoped, append-only history)
@@ -85,9 +85,13 @@ Auth style: **HTTP Basic** (Phase 1 baseline). All endpoints are under the Nginx
 - `GET /notifications`
   - Returns latest notifications for the current merchant (`deliveredAt`, `eventType`, `readAt`, …). Event types include low-stock, **`ORDER_STATUS`**, **`REVIEW_OUTCOME`**, **`REPORT_HANDLING`** (from business hooks and scheduled reporting).
 - `PATCH /notifications/{id}/read`
-  - Marks a notification as read for the merchant scope
-- `POST /api/merchant/events/order-status` — body `{"orderRef":"ORD-1","status":"SHIPPED"}` (emits `ORDER_STATUS`)
-- `POST /api/merchant/events/review-outcome` — body `{"reviewRef":"REV-1","outcome":"APPROVED"}` (emits `REVIEW_OUTCOME`)
+  - Marks a notification as read for the merchant scope (**404** if the row belongs to another merchant)
+- `GET /notifications/subscriptions`
+  - Preference rows for known internal `eventType` values (`LOW_STOCK`, `ORDER_STATUS`, `REVIEW_OUTCOME`, `REPORT_HANDLING`); default enabled when unset.
+- `PUT /notifications/subscriptions`
+  - Body: `{"eventType":"LOW_STOCK","enabled":false}` — persists per-merchant opt-in/out (invalid `eventType` → **400**). When **disabled**, the server **does not insert** in-app notification rows for that `eventType` (including low-stock alerts, merchant business hooks, and scheduled report-handling notifications). Default when no row exists: **enabled**.
+- `POST /api/merchant/events/order-status` — body `{"orderRef":"ORD-1","status":"SHIPPED"}` — response includes `notificationPersisted` (boolean) and `eventType`.
+- `POST /api/merchant/events/review-outcome` — body `{"reviewRef":"REV-1","outcome":"APPROVED"}` — same `notificationPersisted` semantics.
 
 ## Messaging (Phase 3)
 
@@ -111,10 +115,13 @@ Auth style: **HTTP Basic** (Phase 1 baseline). All endpoints are under the Nginx
 {"sessionId":123,"attachmentId":456,"caption":"optional"}
 ```
 
+- Destination: `/app/sessions.create` — optional STOMP path to create a session (no body). Emits a lifecycle event on `/topic/sessions.{merchantId}.lifecycle` and writes `SESSION_CREATED_STOMP` to `audit_logs`. REST `POST /sessions` remains the primary documented HTTP equivalent.
+
 #### Subscribe (merchant-scoped)
 - `/topic/messages.{merchantId}.{sessionId}`
   - Example: `/topic/messages.mrc_A.123`
   - Server blocks cross-tenant subscriptions via `TopicScopeInterceptor`
+- `/topic/sessions.{merchantId}.lifecycle` — session lifecycle fan-out (e.g. `SESSION_CREATED` after `/app/sessions.create`)
 
 ### HTTP sessions (merchant-scoped)
 - `POST /sessions` — create IM session; returns `id`, `createdAt`
@@ -122,6 +129,8 @@ Auth style: **HTTP Basic** (Phase 1 baseline). All endpoints are under the Nginx
 - `GET /sessions/{id}` — fetch one session in tenant scope
 
 ### HTTP messages (merchant-scoped)
+- `GET /sessions/{sessionId}/messages?page=0&size=50` — paginated history; each item includes `readAt`, `recalledAt`, `senderUsername`, `content` (null when recalled), optional `attachmentId`.
+- `GET /sessions/{sessionId}/messages/{messageId}` — single message with the same fields (**404** out of tenant scope).
 - `POST /sessions/{sessionId}/messages/{messageId}/recall` (sender only; clears content)
 - `POST /sessions/{sessionId}/messages/{messageId}/read` (read receipt)
 - `POST /sessions/{sessionId}/messages/image` — body `{"attachmentId":456,"caption":"optional"}` (same semantics as STOMP image send)
@@ -195,6 +204,7 @@ Additional `operationType` values (all require a second admin to execute):
 ## Reporting (Phase 5)
 
 ### Admin (read/write reporting configuration views)
+Interactive reads append `REPORT_READ` surface metadata to `audit_logs` (action names such as `ADMIN_REPORT_INVENTORY_SUMMARY_READ`, …) with `merchantId` / paging where applicable.
 - `GET /api/admin/reports/definitions` — persisted indicator definitions (metadata for report center)
 - `GET /api/admin/reports/inventory/{merchantId}` — live aggregate: total active SKUs + sum of stock
 - `GET /api/admin/reports/inventory/{merchantId}/drill-down?page=0&size=20` — paginated SKU lines (product linkage)
@@ -202,6 +212,7 @@ Additional `operationType` values (all require a second admin to execute):
 - `GET /api/admin/reports/inventory/{merchantId}/daily?limit=30` — recent rows from scheduled daily inventory snapshots
 
 ### Reviewer (read-only oversight)
+Reads are audited similarly (`REVIEWER_REPORT_*_READ`).
 - `GET /api/reviewer/reports/inventory/{merchantId}` — same summary shape as admin inventory summary
 - `GET /api/reviewer/reports/inventory/{merchantId}/drill-down` — same pagination as admin drill-down
 
@@ -215,6 +226,7 @@ Definitions are stored per merchant; execution maps JSON templates onto existing
     - `INVENTORY_SUMMARY` — `{ "template": "INVENTORY_SUMMARY" }`
     - `INVENTORY_DRILL_DOWN` — `{ "template": "INVENTORY_DRILL_DOWN", "page": 0, "size": 20 }`
     - `INVENTORY_MOVEMENT_TIMELINE` — **time dimension** on `inventory_logs`: `{ "template": "INVENTORY_MOVEMENT_TIMELINE", "from": "2026-01-01", "to": "2026-04-01" }` (dates **yyyy-MM-dd**, UTC day buckets; `to` must be strictly after `from`). Response includes `series[]` with `day`, `movementUnits`, `eventCount`.
-- `GET /merchant/custom-reports/{id}` / `PATCH /merchant/custom-reports/{id}` / `DELETE /merchant/custom-reports/{id}`
+    - `BUSINESS_DIMENSION_SUMMARY` — organization + catalog + notification mix: `{ "template": "BUSINESS_DIMENSION_SUMMARY", "sinceDays": 90 }` (`sinceDays` optional, default 90). Response includes inventory totals, active product/SKU counts, and notification counts grouped by `eventType` in the window.
+- `GET /merchant/custom-reports/{id}` / `PATCH /merchant/custom-reports/{id}` / `DELETE /merchant/custom-reports/{id}` — `GET` list/detail audited as `MERCHANT_CUSTOM_REPORT_*_READ`
 - `POST /merchant/custom-reports/{id}/execute` — 200: `{ "reportId", "name", "data": { ... } }`; inactive reports → **400**.
 

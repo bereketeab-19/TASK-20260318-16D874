@@ -2,6 +2,7 @@ package com.petsupplies.reporting.web;
 
 import com.petsupplies.core.security.CurrentPrincipal;
 import com.petsupplies.reporting.service.CustomReportService;
+import com.petsupplies.reporting.service.ReportingAccessAuditService;
 import com.petsupplies.reporting.web.dto.CreateCustomReportRequest;
 import com.petsupplies.reporting.web.dto.UpdateCustomReportRequest;
 import com.petsupplies.user.security.SecurityUser;
@@ -24,15 +25,28 @@ import org.springframework.web.bind.annotation.RestController;
 public class CustomReportController {
   private final CurrentPrincipal currentPrincipal;
   private final CustomReportService customReportService;
+  private final ReportingAccessAuditService reportingAccessAuditService;
 
-  public CustomReportController(CurrentPrincipal currentPrincipal, CustomReportService customReportService) {
+  public CustomReportController(
+      CurrentPrincipal currentPrincipal,
+      CustomReportService customReportService,
+      ReportingAccessAuditService reportingAccessAuditService
+  ) {
     this.currentPrincipal = currentPrincipal;
     this.customReportService = customReportService;
+    this.reportingAccessAuditService = reportingAccessAuditService;
   }
 
   @GetMapping("/merchant/custom-reports")
-  public List<Map<String, Object>> list(Authentication authentication) {
+  public List<Map<String, Object>> list(Authentication authentication, HttpServletRequest request) {
+    var user = currentPrincipal.requireSecurityUser(authentication);
     String merchantId = currentPrincipal.requireMerchantId(authentication);
+    reportingAccessAuditService.record(
+        "MERCHANT_CUSTOM_REPORT_LIST_READ",
+        user.getUsername(),
+        request.getRemoteAddr(),
+        Map.of("merchantId", merchantId, "path", request.getRequestURI())
+    );
     return customReportService.listRows(merchantId);
   }
 
@@ -44,8 +58,15 @@ public class CustomReportController {
   }
 
   @GetMapping("/merchant/custom-reports/{id}")
-  public Map<String, Object> get(Authentication authentication, @PathVariable("id") Long id) {
+  public Map<String, Object> get(Authentication authentication, HttpServletRequest request, @PathVariable("id") Long id) {
+    var user = currentPrincipal.requireSecurityUser(authentication);
     String merchantId = currentPrincipal.requireMerchantId(authentication);
+    reportingAccessAuditService.record(
+        "MERCHANT_CUSTOM_REPORT_GET_READ",
+        user.getUsername(),
+        request.getRemoteAddr(),
+        Map.of("merchantId", merchantId, "reportDefinitionId", id, "path", request.getRequestURI())
+    );
     return customReportService.toRow(customReportService.requireScoped(id, merchantId));
   }
 

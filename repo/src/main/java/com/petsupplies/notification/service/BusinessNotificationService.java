@@ -14,15 +14,25 @@ public class BusinessNotificationService {
   public static final String EVENT_REPORT_HANDLING = "REPORT_HANDLING";
 
   private final NotificationRepository notificationRepository;
+  private final NotificationSubscriptionService notificationSubscriptionService;
   private final Clock clock;
 
-  public BusinessNotificationService(NotificationRepository notificationRepository, Clock clock) {
+  public BusinessNotificationService(
+      NotificationRepository notificationRepository,
+      NotificationSubscriptionService notificationSubscriptionService,
+      Clock clock
+  ) {
     this.notificationRepository = notificationRepository;
+    this.notificationSubscriptionService = notificationSubscriptionService;
     this.clock = clock;
   }
 
+  /** @return true if an in-app notification row was persisted */
   @Transactional
-  public void publishOrderStatus(String merchantId, String orderRef, String status) {
+  public boolean publishOrderStatus(String merchantId, String orderRef, String status) {
+    if (!notificationSubscriptionService.isDeliveryEnabled(merchantId, EVENT_ORDER_STATUS)) {
+      return false;
+    }
     Instant now = Instant.now(clock);
     Notification n = new Notification();
     n.setMerchantId(merchantId);
@@ -31,10 +41,15 @@ public class BusinessNotificationService {
     n.setDeliveredAt(now);
     n.setEventType(EVENT_ORDER_STATUS);
     notificationRepository.save(n);
+    return true;
   }
 
+  /** @return true if an in-app notification row was persisted */
   @Transactional
-  public void publishReviewOutcome(String merchantId, String reviewRef, String outcome) {
+  public boolean publishReviewOutcome(String merchantId, String reviewRef, String outcome) {
+    if (!notificationSubscriptionService.isDeliveryEnabled(merchantId, EVENT_REVIEW_OUTCOME)) {
+      return false;
+    }
     Instant now = Instant.now(clock);
     Notification n = new Notification();
     n.setMerchantId(merchantId);
@@ -43,10 +58,15 @@ public class BusinessNotificationService {
     n.setDeliveredAt(now);
     n.setEventType(EVENT_REVIEW_OUTCOME);
     notificationRepository.save(n);
+    return true;
   }
 
+  /** @return true if an in-app notification row was persisted */
   @Transactional
-  public void publishReportHandling(String merchantId, String detail) {
+  public boolean publishReportHandling(String merchantId, String detail) {
+    if (!notificationSubscriptionService.isDeliveryEnabled(merchantId, EVENT_REPORT_HANDLING)) {
+      return false;
+    }
     Instant now = Instant.now(clock);
     Notification n = new Notification();
     n.setMerchantId(merchantId);
@@ -55,5 +75,6 @@ public class BusinessNotificationService {
     n.setDeliveredAt(now);
     n.setEventType(EVENT_REPORT_HANDLING);
     notificationRepository.save(n);
+    return true;
   }
 }

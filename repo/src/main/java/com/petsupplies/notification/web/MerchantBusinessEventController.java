@@ -32,14 +32,20 @@ public class MerchantBusinessEventController {
   @PostMapping("/api/merchant/events/order-status")
   public Map<String, Object> orderStatus(Authentication authentication, @Valid @RequestBody OrderStatusEventRequest body) {
     String merchantId = currentPrincipal.requireMerchantId(authentication);
-    businessNotificationService.publishOrderStatus(merchantId, body.orderRef(), body.status());
-    return Map.of("dispatched", true, "eventType", BusinessNotificationService.EVENT_ORDER_STATUS);
+    boolean persisted = businessNotificationService.publishOrderStatus(merchantId, body.orderRef(), body.status());
+    return Map.of(
+        "dispatched", true,
+        "notificationPersisted", persisted,
+        "eventType", BusinessNotificationService.EVENT_ORDER_STATUS);
   }
 
   @PostMapping("/api/merchant/events/review-outcome")
   public Map<String, Object> reviewOutcome(Authentication authentication, @Valid @RequestBody ReviewOutcomeEventRequest body) {
     String merchantId = currentPrincipal.requireMerchantId(authentication);
-    businessNotificationService.publishReviewOutcome(merchantId, body.reviewRef(), body.outcome());
-    return Map.of("dispatched", true, "eventType", BusinessNotificationService.EVENT_REVIEW_OUTCOME);
+    boolean persisted = businessNotificationService.publishReviewOutcome(merchantId, body.reviewRef(), body.outcome());
+    return Map.of(
+        "dispatched", true,
+        "notificationPersisted", persisted,
+        "eventType", BusinessNotificationService.EVENT_REVIEW_OUTCOME);
   }
 }

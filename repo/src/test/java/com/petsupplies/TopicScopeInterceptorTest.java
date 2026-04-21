@@ -16,6 +16,29 @@ import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 
 class TopicScopeInterceptorTest {
   @Test
+  void merchant_may_subscribe_to_own_sessions_lifecycle_topic() {
+    var interceptor = new TopicScopeInterceptor();
+    var user = new SecurityUser(
+        1L,
+        "merchantA",
+        "x",
+        "mrc_A",
+        List.of(new SimpleGrantedAuthority("ROLE_MERCHANT"))
+    );
+
+    var auth = new UsernamePasswordAuthenticationToken(user, "x", user.getAuthorities());
+
+    StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
+    accessor.setDestination("/topic/sessions.mrc_A.lifecycle");
+    accessor.setUser(auth);
+    accessor.setLeaveMutable(true);
+
+    Message<byte[]> msg = MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
+
+    interceptor.preSend(msg, new org.springframework.messaging.support.ExecutorSubscribableChannel());
+  }
+
+  @Test
   void merchantA_cannot_subscribe_to_merchantB_topic() {
     var interceptor = new TopicScopeInterceptor();
     var user = new SecurityUser(

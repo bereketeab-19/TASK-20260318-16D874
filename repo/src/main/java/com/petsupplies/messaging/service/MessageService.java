@@ -9,8 +9,11 @@ import com.petsupplies.messaging.repo.MessageRepository;
 import com.petsupplies.messaging.repo.SessionRepository;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -177,6 +180,48 @@ public class MessageService {
       m.setReadAt(Instant.now(clock));
       messageRepository.save(m);
     }
+  }
+
+  @Transactional(readOnly = true)
+  public Map<String, Object> listSessionMessages(String merchantId, Long sessionId, int page, int size) {
+    requireSession(merchantId, sessionId);
+    Page<Message> p =
+        messageRepository.findByMerchantIdAndSession_IdOrderBySentAtAsc(
+            merchantId, sessionId, PageRequest.of(page, size));
+    return Map.of(
+        "content",
+        p.getContent().stream().map(this::toMessageView).toList(),
+        "page",
+        p.getNumber(),
+        "size",
+        p.getSize(),
+        "totalElements",
+        p.getTotalElements(),
+        "totalPages",
+        p.getTotalPages()
+    );
+  }
+
+  @Transactional(readOnly = true)
+  public Map<String, Object> getSessionMessage(String merchantId, Long sessionId, Long messageId) {
+    Message m = messageRepository.findByIdAndMerchantIdAndSession_Id(messageId, merchantId, sessionId)
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Not found"));
+    return toMessageView(m);
+  }
+
+  private Map<String, Object> toMessageView(Message m) {
+    Map<String, Object> row = new LinkedHashMap<>();
+    row.put("id", m.getId());
+    row.put("sessionId", m.getSession().getId());
+    row.put("senderUsername", m.getSenderUsername());
+    row.put("content", m.getRecalledAt() != null ? null : m.getContent());
+    row.put("sentAt", m.getSentAt());
+    row.put("readAt", m.getReadAt());
+    row.put("recalledAt", m.getRecalledAt());
+    if (m.getAttachment() != null) {
+      row.put("attachmentId", m.getAttachment().getId());
+    }
+    return row;
   }
 
   public record MessageResult(Long messageId, boolean folded) {}

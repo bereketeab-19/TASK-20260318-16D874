@@ -1,5 +1,6 @@
 package com.petsupplies.messaging.web;
 
+import com.petsupplies.auditing.service.AuditService;
 import com.petsupplies.core.security.CurrentPrincipal;
 import com.petsupplies.messaging.service.MessageService;
 import com.petsupplies.messaging.web.dto.SendImageMessage;
@@ -17,15 +18,43 @@ public class MessagingController {
   private final CurrentPrincipal currentPrincipal;
   private final MessageService messageService;
   private final SimpMessagingTemplate messagingTemplate;
+  private final AuditService auditService;
 
   public MessagingController(
       CurrentPrincipal currentPrincipal,
       MessageService messageService,
-      SimpMessagingTemplate messagingTemplate
+      SimpMessagingTemplate messagingTemplate,
+      AuditService auditService
   ) {
     this.currentPrincipal = currentPrincipal;
     this.messageService = messageService;
     this.messagingTemplate = messagingTemplate;
+    this.auditService = auditService;
+  }
+
+  /**
+   * Creates a chat session and broadcasts lifecycle on {@code /topic/sessions.{merchantId}.lifecycle}
+   * (same scope rules as {@link com.petsupplies.messaging.web.SessionHttpController#create}).
+   */
+  @MessageMapping("/sessions.create")
+  public void createSession(Authentication authentication) {
+    currentPrincipal.requireMerchantRole(authentication);
+    var user = currentPrincipal.requireSecurityUser(authentication);
+    String merchantId = currentPrincipal.requireMerchantId(authentication);
+    var session = messageService.createSession(merchantId);
+    Map<String, Object> lifecycle = Map.of(
+        "event", "SESSION_CREATED",
+        "sessionId", session.getId(),
+        "createdAt", session.getCreatedAt(),
+        "createdBy", user.getUsername()
+    );
+    messagingTemplate.convertAndSend("/topic/sessions." + merchantId + ".lifecycle", lifecycle);
+    auditService.record(
+        "SESSION_CREATED_STOMP",
+        Map.of("merchantId", merchantId, "sessionId", session.getId()),
+        user.getUsername(),
+        null
+    );
   }
 
   @MessageMapping("/messages.sendText")

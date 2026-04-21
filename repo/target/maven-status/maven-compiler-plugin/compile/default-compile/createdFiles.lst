@@ -1,3 +1,4 @@
+com\petsupplies\notification\web\dto\UpsertNotificationSubscriptionRequest.class
 com\petsupplies\user\domain\User.class
 com\petsupplies\user\security\SecurityUser.class
 com\petsupplies\catalog\BuyerCatalogController.class
@@ -23,6 +24,7 @@ com\petsupplies\product\service\MerchantSettingsService.class
 com\petsupplies\reporting\repo\CustomReportDefinitionRepository.class
 com\petsupplies\core\api\ErrorResponse.class
 com\petsupplies\achievement\web\dto\CreateAchievementRequest.class
+com\petsupplies\notification\domain\NotificationEventSubscription.class
 com\petsupplies\product\repo\SkuAttributeValueRepository.class
 com\petsupplies\achievement\service\AchievementService.class
 com\petsupplies\core\security\Pbkdf2Sha256PasswordEncoder$Parsed.class
@@ -89,6 +91,7 @@ com\petsupplies\core\web\AdminController.class
 com\petsupplies\product\service\BatchImportException.class
 com\petsupplies\messaging\service\MessageService$MessageResult.class
 com\petsupplies\product\repo\CategoryRepository.class
+com\petsupplies\reporting\service\ReportingAccessAuditService.class
 com\petsupplies\product\service\CategoryService$CategoryRow.class
 com\petsupplies\product\service\ProductAttributeService.class
 com\petsupplies\reporting\repo\DailyInventoryReportRepository.class
@@ -99,6 +102,7 @@ com\petsupplies\notification\domain\Notification.class
 com\petsupplies\notification\service\BusinessNotificationService.class
 com\petsupplies\core\crypto\AesGcmEncryptionService.class
 com\petsupplies\messaging\web\dto\SendImageMessageHttpRequest.class
+com\petsupplies\notification\repo\NotificationEventSubscriptionRepository.class
 com\petsupplies\messaging\web\dto\SendImageMessage.class
 com\petsupplies\cooking\repo\CookingTimerRepository.class
 com\petsupplies\messaging\repo\MessageRepository.class
@@ -142,6 +146,7 @@ com\petsupplies\core\security\Pbkdf2Sha256PasswordEncoder.class
 com\petsupplies\messaging\service\AntiSpamCache.class
 com\petsupplies\reporting\domain\ReportIndicatorDefinition.class
 com\petsupplies\cooking\repo\CookingStepRepository.class
+com\petsupplies\notification\service\NotificationSubscriptionService.class
 com\petsupplies\notification\web\MerchantBusinessEventController.class
 com\petsupplies\messaging\web\AttachmentController.class
 com\petsupplies\achievement\domain\Achievement.class

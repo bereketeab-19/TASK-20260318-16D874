@@ -70,11 +70,15 @@ C:\Users\lenovo\Documents\Pet Supplies\TASK-20260318-16D874\repo\src\main\java\c
 C:\Users\lenovo\Documents\Pet Supplies\TASK-20260318-16D874\repo\src\main\java\com\petsupplies\messaging\web\MessagingHttpController.java
 C:\Users\lenovo\Documents\Pet Supplies\TASK-20260318-16D874\repo\src\main\java\com\petsupplies\messaging\web\SessionHttpController.java
 C:\Users\lenovo\Documents\Pet Supplies\TASK-20260318-16D874\repo\src\main\java\com\petsupplies\notification\domain\Notification.java
+C:\Users\lenovo\Documents\Pet Supplies\TASK-20260318-16D874\repo\src\main\java\com\petsupplies\notification\domain\NotificationEventSubscription.java
+C:\Users\lenovo\Documents\Pet Supplies\TASK-20260318-16D874\repo\src\main\java\com\petsupplies\notification\repo\NotificationEventSubscriptionRepository.java
 C:\Users\lenovo\Documents\Pet Supplies\TASK-20260318-16D874\repo\src\main\java\com\petsupplies\notification\repo\NotificationRepository.java
 C:\Users\lenovo\Documents\Pet Supplies\TASK-20260318-16D874\repo\src\main\java\com\petsupplies\notification\service\BusinessNotificationService.java
 C:\Users\lenovo\Documents\Pet Supplies\TASK-20260318-16D874\repo\src\main\java\com\petsupplies\notification\service\NotificationService.java
+C:\Users\lenovo\Documents\Pet Supplies\TASK-20260318-16D874\repo\src\main\java\com\petsupplies\notification\service\NotificationSubscriptionService.java
 C:\Users\lenovo\Documents\Pet Supplies\TASK-20260318-16D874\repo\src\main\java\com\petsupplies\notification\web\dto\OrderStatusEventRequest.java
 C:\Users\lenovo\Documents\Pet Supplies\TASK-20260318-16D874\repo\src\main\java\com\petsupplies\notification\web\dto\ReviewOutcomeEventRequest.java
+C:\Users\lenovo\Documents\Pet Supplies\TASK-20260318-16D874\repo\src\main\java\com\petsupplies\notification\web\dto\UpsertNotificationSubscriptionRequest.java
 C:\Users\lenovo\Documents\Pet Supplies\TASK-20260318-16D874\repo\src\main\java\com\petsupplies\notification\web\MerchantBusinessEventController.java
 C:\Users\lenovo\Documents\Pet Supplies\TASK-20260318-16D874\repo\src\main\java\com\petsupplies\notification\web\NotificationController.java
 C:\Users\lenovo\Documents\Pet Supplies\TASK-20260318-16D874\repo\src\main\java\com\petsupplies\product\domain\AttributeDefinition.java
@@ -128,6 +132,7 @@ C:\Users\lenovo\Documents\Pet Supplies\TASK-20260318-16D874\repo\src\main\java\c
 C:\Users\lenovo\Documents\Pet Supplies\TASK-20260318-16D874\repo\src\main\java\com\petsupplies\reporting\repo\ReportIndicatorDefinitionRepository.java
 C:\Users\lenovo\Documents\Pet Supplies\TASK-20260318-16D874\repo\src\main\java\com\petsupplies\reporting\repo\ReportingRepository.java
 C:\Users\lenovo\Documents\Pet Supplies\TASK-20260318-16D874\repo\src\main\java\com\petsupplies\reporting\service\CustomReportService.java
+C:\Users\lenovo\Documents\Pet Supplies\TASK-20260318-16D874\repo\src\main\java\com\petsupplies\reporting\service\ReportingAccessAuditService.java
 C:\Users\lenovo\Documents\Pet Supplies\TASK-20260318-16D874\repo\src\main\java\com\petsupplies\reporting\service\ReportingService.java
 C:\Users\lenovo\Documents\Pet Supplies\TASK-20260318-16D874\repo\src\main\java\com\petsupplies\reporting\web\CustomReportController.java
 C:\Users\lenovo\Documents\Pet Supplies\TASK-20260318-16D874\repo\src\main\java\com\petsupplies\reporting\web\dto\CreateCustomReportRequest.java
