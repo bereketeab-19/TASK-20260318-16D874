@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.petsupplies.MessagingImageHttpIntegrationTest
 -------------------------------------------------------------------------------
-Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.346 s -- in com.petsupplies.MessagingImageHttpIntegrationTest
+Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.863 s -- in com.petsupplies.MessagingImageHttpIntegrationTest
