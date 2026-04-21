@@ -1,0 +1,21 @@
+ALTER TABLE notifications
+  ADD COLUMN delivered_at TIMESTAMP NULL,
+  ADD COLUMN event_type VARCHAR(64) NULL;
+
+UPDATE notifications SET delivered_at = created_at WHERE delivered_at IS NULL;
+
+ALTER TABLE messages
+  ADD COLUMN recalled_at TIMESTAMP NULL,
+  ADD COLUMN read_at TIMESTAMP NULL;
+
+CREATE TABLE system_config (
+  config_key VARCHAR(128) NOT NULL PRIMARY KEY,
+  config_value TEXT NOT NULL,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+ALTER TABLE users
+  ADD COLUMN contact_encrypted TEXT NULL;
+
+ALTER TABLE products
+  ADD COLUMN active BOOLEAN NOT NULL DEFAULT TRUE;

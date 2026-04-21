@@ -1,0 +1,3 @@
+0 0 * * * /usr/local/bin/backup.sh full >> /backups/backup.log 2>&1
+0 * * * * /usr/local/bin/backup.sh binlog >> /backups/backup.log 2>&1
+

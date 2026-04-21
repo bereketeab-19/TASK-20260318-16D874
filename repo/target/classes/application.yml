@@ -1,0 +1,46 @@
+server:
+  port: 8080
+  forward-headers-strategy: framework
+
+spring:
+  application:
+    name: petsupplies
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:petsupplies}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: ${DB_USER:app_user}
+    password: ${DB_PASSWORD:app_pass}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    user: ${FLYWAY_USER:migrator_user}
+    password: ${FLYWAY_PASSWORD:migrator_pass}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  level:
+    root: INFO
+
+app:
+  crypto:
+    # Required at runtime: 64 hex chars = 32-byte AES-256 key. Set APP_CRYPTO_HEX_KEY (see README, docker-compose).
+    hex-key: ${APP_CRYPTO_HEX_KEY:}
+  websocket:
+    allowed-origin-patterns: ${APP_WS_ORIGINS:http://localhost:*,https://localhost:*,http://127.0.0.1:*,https://127.0.0.1:*}
+  attachments:
+    dir: ${ATTACHMENTS_DIR:./attachments}
+  achievementAttachments:
+    dir: ${ACH_ATTACHMENTS_DIR:./achievement_attachments}
+
