@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.petsupplies.MessagingRecallAndNotificationAuthzIntegrationTest
 -------------------------------------------------------------------------------
-Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 15.59 s -- in com.petsupplies.MessagingRecallAndNotificationAuthzIntegrationTest
+Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 4.217 s -- in com.petsupplies.MessagingRecallAndNotificationAuthzIntegrationTest
